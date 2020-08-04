@@ -24,7 +24,7 @@ import re
 import sys
 
 # Decodes a Makefile assignment line into key and value (and plus for +=)
-RE_KEY_VALUE = re.compile('(?P<key>\w+) *(?P<plus>[+])?= *(?P<value>.*)$')
+RE_KEY_VALUE = re.compile("(?P<key>\w+) *(?P<plus>[+])?= *(?P<value>.*)$")
 
 
 def ParseMakefile(fname):
@@ -44,25 +44,26 @@ def ParseMakefile(fname):
     """
     makevars = {}
     with open(fname) as fd:
-        prev_text = ''  # Continuation text from previous line(s)
+        prev_text = ""  # Continuation text from previous line(s)
         for line in fd.read().splitlines():
-          if line and line[-1] == '\\':  # Deal with line continuation
-            prev_text += line[:-1]
-            continue
-          elif prev_text:
-            line = prev_text + line
-            prev_text = ''  # Continuation is now used up
-          m = RE_KEY_VALUE.match(line)
-          if m:
-            value = m.group('value') or ''
-            key = m.group('key')
+            if line and line[-1] == "\\":  # Deal with line continuation
+                prev_text += line[:-1]
+                continue
+            elif prev_text:
+                line = prev_text + line
+                prev_text = ""  # Continuation is now used up
+            m = RE_KEY_VALUE.match(line)
+            if m:
+                value = m.group("value") or ""
+                key = m.group("key")
 
-            # Appending to a variable inserts a space beforehand
-            if 'plus' in m.groupdict() and key in makevars:
-              makevars[key] += ' ' + value
-            else:
-              makevars[key] = value
+                # Appending to a variable inserts a space beforehand
+                if "plus" in m.groupdict() and key in makevars:
+                    makevars[key] += " " + value
+                else:
+                    makevars[key] = value
     return makevars
+
 
 def GetEnvFromMakefiles():
     """Scan the Makefiles to obtain the settings we need.
@@ -79,25 +80,35 @@ def GetEnvFromMakefiles():
             Object directory to use (always '')
     """
     basedir = os.path.dirname(os.path.dirname(os.path.abspath(sys.argv[0])))
-    swig_opts = ['-I%s' % basedir]
-    makevars = ParseMakefile(os.path.join(basedir, 'Makefile'))
-    version = '%s.%s.%s' % (makevars['VERSION'], makevars['PATCHLEVEL'],
-                            makevars['SUBLEVEL'])
-    makevars = ParseMakefile(os.path.join(basedir, 'libfdt', 'Makefile.libfdt'))
-    files = makevars['LIBFDT_SRCS'].split()
-    files = [os.path.join(basedir, 'libfdt', fname) for fname in files]
-    files.append('pylibfdt/libfdt.i')
-    cflags = ['-I%s' % basedir, '-I%s/libfdt' % basedir]
-    objdir = ''
+    swig_opts = ["-I%s" % basedir]
+    makevars = ParseMakefile(os.path.join(basedir, "Makefile"))
+    version = "%s.%s.%s" % (
+        makevars["VERSION"],
+        makevars["PATCHLEVEL"],
+        makevars["SUBLEVEL"],
+    )
+    makevars = ParseMakefile(
+        os.path.join(basedir, "libfdt", "Makefile.libfdt")
+    )
+    files = makevars["LIBFDT_SRCS"].split()
+    files = [os.path.join(basedir, "libfdt", fname) for fname in files]
+    files.append("pylibfdt/libfdt.i")
+    cflags = ["-I%s" % basedir, "-I%s/libfdt" % basedir]
+    objdir = ""
     return swig_opts, version, files, cflags, objdir
 
 
 progname = sys.argv[0]
-files = os.environ.get('SOURCES', '').split()
-cflags = os.environ.get('CPPFLAGS', '').split()
-objdir = os.environ.get('OBJDIR')
-version = os.environ.get('VERSION')
-swig_opts = os.environ.get('SWIG_OPTS', '').split()
+files = os.environ.get("SOURCES", "").split()
+cflags = os.environ.get("CPPFLAGS", "").split()
+ldflags = [
+    "-lpython3.8",
+    "-L/opt/local/Library/Frameworks/Python.framework/Versions/3.8/lib",
+]
+objdir = os.environ.get("OBJDIR")
+version = os.environ.get("VERSION")
+swig_opts = os.environ.get("SWIG_OPTS", "").split()
+
 
 # If we were called directly rather than through our Makefile (which is often
 # the case with Python module installation), read the settings from the
@@ -105,19 +116,24 @@ swig_opts = os.environ.get('SWIG_OPTS', '').split()
 if not all((swig_opts, version, files, cflags, objdir)):
     swig_opts, version, files, cflags, objdir = GetEnvFromMakefiles()
 
+cflags += [
+    "-I/opt/local/Library/Frameworks/Python.framework/Versions/3.8/include"
+]
+
 libfdt_module = Extension(
-    '_libfdt',
-    sources = files,
-    extra_compile_args = cflags,
-    swig_opts = swig_opts,
+    "_libfdt",
+    sources=files,
+    extra_compile_args=cflags,
+    extra_link_args=ldflags,
+    swig_opts=swig_opts,
 )
 
 setup(
-    name='libfdt',
-    version= version,
-    author='Simon Glass <sjg@chromium.org>',
-    description='Python binding for libfdt',
+    name="libfdt",
+    version=version,
+    author="Simon Glass <sjg@chromium.org>",
+    description="Python binding for libfdt",
     ext_modules=[libfdt_module],
-    package_dir={'': objdir},
-    py_modules=['pylibfdt/libfdt'],
+    package_dir={"": objdir},
+    py_modules=["pylibfdt/libfdt"],
 )
